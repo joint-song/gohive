@@ -1,9 +1,9 @@
-module github.com/beltran/gohive
+module github.com/joint-song/gohive
 
-go 1.19
+go 1.18
 
 require (
-	github.com/apache/thrift v0.18.1
+	github.com/apache/thrift v0.0.0-20161221203622-b2a4d4ae21c7
 	github.com/beltran/gosasl v0.0.0-20240109120436-e08f7517fc34
 	github.com/go-zookeeper/zk v1.0.1
 	github.com/pkg/errors v0.9.1

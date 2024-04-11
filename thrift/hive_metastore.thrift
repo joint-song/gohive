@@ -22,7 +22,7 @@
 # Thrift Service that the MetaStore is built on
 #
 
-include "/root/gohive/thrift/fb303.thrift"
+include "fb303.thrift"
 
 namespace java org.apache.hadoop.hive.metastore.api
 namespace php metastore

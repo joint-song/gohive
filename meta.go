@@ -2,10 +2,11 @@ package gohive
 
 import (
 	"fmt"
-	"github.com/apache/thrift/lib/go/thrift"
-	"github.com/beltran/gohive/hive_metastore"
 	"os/user"
 	"strings"
+
+	"github.com/apache/thrift/lib/go/thrift"
+	"github.com/joint-song/gohive/hive_metastore"
 )
 
 type HiveMetastoreClient struct {
@@ -80,9 +81,7 @@ func ConnectToMetastore(host string, port int, auth string, configuration *Metas
 	}
 
 	protocolFactory := thrift.NewTBinaryProtocolFactoryDefault()
-	iprot := protocolFactory.GetProtocol(transport)
-	oprot := protocolFactory.GetProtocol(transport)
-	c := hive_metastore.NewThriftHiveMetastoreClient(thrift.NewTStandardClient(iprot, oprot))
+	c := hive_metastore.NewThriftHiveMetastoreClientFactory(transport, protocolFactory)
 	if !transport.IsOpen() {
 		if err = transport.Open(); err != nil {
 			return

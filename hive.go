@@ -17,9 +17,9 @@ import (
 	"time"
 
 	"github.com/apache/thrift/lib/go/thrift"
-	"github.com/beltran/gohive/hiveserver"
 	"github.com/beltran/gosasl"
 	"github.com/go-zookeeper/zk"
+	"github.com/joint-song/gohive/hiveserver"
 	"github.com/pkg/errors"
 )
 
@@ -200,29 +200,15 @@ func innerConnect(ctx context.Context, host string, port int, auth string,
 			return
 		}
 		if configuration.TLSConfig != nil {
-			socket = thrift.NewTSSLSocketFromConnConf(netConn, &thrift.TConfiguration{
-				ConnectTimeout: configuration.ConnectTimeout,
-				SocketTimeout:  configuration.SocketTimeout,
-				TLSConfig:      configuration.TLSConfig,
-			})
+			socket = thrift.NewTSSLSocketFromConnTimeout(netConn, configuration.TLSConfig, configuration.ConnectTimeout)
 		} else {
-			socket = thrift.NewTSocketFromConnConf(netConn, &thrift.TConfiguration{
-				ConnectTimeout: configuration.ConnectTimeout,
-				SocketTimeout:  configuration.SocketTimeout,
-			})
+			socket = thrift.NewTSocketFromConnTimeout(netConn, configuration.ConnectTimeout)
 		}
 	} else {
 		if configuration.TLSConfig != nil {
-			socket = thrift.NewTSSLSocketConf(addr, &thrift.TConfiguration{
-				ConnectTimeout: configuration.ConnectTimeout,
-				SocketTimeout:  configuration.SocketTimeout,
-				TLSConfig:      configuration.TLSConfig,
-			})
+			socket, err = thrift.NewTSSLSocketTimeout(addr, configuration.TLSConfig, configuration.ConnectTimeout)
 		} else {
-			socket = thrift.NewTSocketConf(addr, &thrift.TConfiguration{
-				ConnectTimeout: configuration.ConnectTimeout,
-				SocketTimeout:  configuration.SocketTimeout,
-			})
+			socket, err = thrift.NewTSocketTimeout(addr, configuration.ConnectTimeout)
 		}
 		if err = socket.Open(); err != nil {
 			return
@@ -253,10 +239,7 @@ func innerConnect(ctx context.Context, host string, port int, auth string,
 				return nil, err
 			}
 			httpOptions := thrift.THttpClientOptions{Client: httpClient}
-			transport, err = thrift.NewTHttpClientTransportFactoryWithOptions(fmt.Sprintf(protocol+"://%s:%s@%s:%d/"+configuration.HTTPPath, url.QueryEscape(configuration.Username), url.QueryEscape(configuration.Password), host, port), httpOptions).GetTransport(socket)
-			if err != nil {
-				return nil, err
-			}
+			transport = thrift.NewTHttpClientTransportFactoryWithOptions(fmt.Sprintf(protocol+"://%s:%s@%s:%d/"+configuration.HTTPPath, url.QueryEscape(configuration.Username), url.QueryEscape(configuration.Password), host, port), httpOptions).GetTransport(socket)
 		} else if auth == "KERBEROS" {
 			mechanism, err := gosasl.NewGSSAPIMechanism(configuration.Service)
 			if err != nil {
@@ -280,13 +263,10 @@ func innerConnect(ctx context.Context, host string, port int, auth string,
 			httpOptions := thrift.THttpClientOptions{
 				Client: httpClient,
 			}
-			transport, err = thrift.NewTHttpClientTransportFactoryWithOptions(fmt.Sprintf(protocol+"://%s:%d/"+configuration.HTTPPath, host, port), httpOptions).GetTransport(socket)
+			transport = thrift.NewTHttpClientTransportFactoryWithOptions(fmt.Sprintf(protocol+"://%s:%d/"+configuration.HTTPPath, host, port), httpOptions).GetTransport(socket)
 			httpTransport, ok := transport.(*thrift.THttpClient)
 			if ok {
 				httpTransport.SetHeader("Authorization", "Negotiate "+base64.StdEncoding.EncodeToString(token))
-			}
-			if err != nil {
-				return nil, err
 			}
 		} else {
 			panic("Unrecognized auth")
@@ -336,7 +316,7 @@ func innerConnect(ctx context.Context, host string, port int, auth string,
 	openSession.Username = &configuration.Username
 	openSession.Password = &configuration.Password
 	// Context is ignored
-	response, err := client.OpenSession(context.Background(), openSession)
+	response, err := client.OpenSession(openSession)
 	if err != nil {
 		return
 	}
@@ -405,7 +385,7 @@ func (c *Connection) Close() error {
 	closeRequest := hiveserver.NewTCloseSessionReq()
 	closeRequest.SessionHandle = c.sessionHandle
 	// This context is ignored
-	responseClose, err := c.client.CloseSession(context.Background(), closeRequest)
+	responseClose, err := c.client.CloseSession(closeRequest)
 
 	if c.transport != nil {
 		errTransport := c.transport.Close()
@@ -578,7 +558,7 @@ func (c *Cursor) executeAsync(ctx context.Context, query string) {
 	executeReq.RunAsync = true
 	var responseExecute *hiveserver.TExecuteStatementResp = nil
 
-	responseExecute, c.Err = c.conn.client.ExecuteStatement(ctx, executeReq)
+	responseExecute, c.Err = c.conn.client.ExecuteStatement(executeReq)
 
 	if c.Err != nil {
 		if strings.Contains(c.Err.Error(), "context deadline exceeded") {
@@ -617,7 +597,7 @@ func (c *Cursor) Poll(getProgress bool) (status *hiveserver.TGetOperationStatusR
 	pollRequest.GetProgressUpdate = &progressGet
 	var responsePoll *hiveserver.TGetOperationStatusResp
 	// Context ignored
-	responsePoll, c.Err = c.conn.client.GetOperationStatus(context.Background(), pollRequest)
+	responsePoll, c.Err = c.conn.client.GetOperationStatus(pollRequest)
 	if c.Err != nil {
 		return nil
 	}
@@ -637,7 +617,7 @@ func (c *Cursor) FetchLogs() []string {
 	// FetchType 1 is "logs"
 	logRequest.FetchType = 1
 
-	resp, err := c.conn.client.FetchResults(context.Background(), logRequest)
+	resp, err := c.conn.client.FetchResults(logRequest)
 	if err != nil || resp == nil || resp.Results == nil {
 		c.Err = err
 		return nil
@@ -684,7 +664,7 @@ func (c *Cursor) fetchIfEmpty(ctx context.Context) {
 	}
 }
 
-//RowMap returns one row as a map. Advances the cursor one
+// RowMap returns one row as a map. Advances the cursor one
 func (c *Cursor) RowMap(ctx context.Context) map[string]interface{} {
 	c.Err = nil
 	c.fetchIfEmpty(ctx)
@@ -1034,7 +1014,7 @@ func (c *Cursor) Description() [][]string {
 
 	metaRequest := hiveserver.NewTGetResultSetMetadataReq()
 	metaRequest.OperationHandle = c.operationHandle
-	metaResponse, err := c.conn.client.GetResultSetMetadata(context.Background(), metaRequest)
+	metaResponse, err := c.conn.client.GetResultSetMetadata(metaRequest)
 	if err != nil {
 		c.Err = err
 		return nil
@@ -1092,7 +1072,7 @@ func (c *Cursor) pollUntilData(ctx context.Context, n int) (err error) {
 			fetchRequest.OperationHandle = c.operationHandle
 			fetchRequest.Orientation = hiveserver.TFetchOrientation_FETCH_NEXT
 			fetchRequest.MaxRows = c.conn.configuration.FetchSize
-			responseFetch, err := c.conn.client.FetchResults(context.Background(), fetchRequest)
+			responseFetch, err := c.conn.client.FetchResults(fetchRequest)
 			if err != nil {
 				rowsAvailable <- err
 				return
@@ -1147,7 +1127,7 @@ func (c *Cursor) Cancel() {
 	cancelRequest.OperationHandle = c.operationHandle
 	var responseCancel *hiveserver.TCancelOperationResp
 	// This context is simply ignored
-	responseCancel, c.Err = c.conn.client.CancelOperation(context.Background(), cancelRequest)
+	responseCancel, c.Err = c.conn.client.CancelOperation(cancelRequest)
 	if c.Err != nil {
 		return
 	}
@@ -1175,7 +1155,7 @@ func (c *Cursor) resetState() error {
 		closeRequest := hiveserver.NewTCloseOperationReq()
 		closeRequest.OperationHandle = c.operationHandle
 		// This context is ignored
-		responseClose, err := c.conn.client.CloseOperation(context.Background(), closeRequest)
+		responseClose, err := c.conn.client.CloseOperation(closeRequest)
 		c.operationHandle = nil
 		if err != nil {
 			return err

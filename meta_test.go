@@ -1,13 +1,13 @@
 package gohive
 
 import (
-	"context"
-	"github.com/beltran/gohive/hive_metastore"
-	"log"
-	"os"
 	"fmt"
-	"testing"
+	"log"
 	"math/rand"
+	"os"
+	"testing"
+
+	"github.com/joint-song/gohive/hive_metastore"
 )
 
 var lettersDb = []rune("abcdefghijklmnopqrstuvwxyz")
@@ -25,7 +25,7 @@ var randNameDb = randSeqDb(10)
 
 func GetDatabaseName() string {
 	tableName := fmt.Sprintf("db_pokes_%s%d", randNameDb, tableIdDb)
-	tableIdDb+= 1
+	tableIdDb += 1
 	return tableName
 }
 
@@ -41,7 +41,6 @@ func TestConnectDefaultMeta(t *testing.T) {
 	}
 	client.Close()
 }
-
 
 func TestConnectNoneMetaFails(t *testing.T) {
 	if os.Getenv("METASTORE_SKIP") == "1" {
@@ -82,22 +81,22 @@ func TestDatabaseOperations(t *testing.T) {
 	database := hive_metastore.Database{
 		Name:        name,
 		LocationUri: "/"}
-	err = connection.Client.CreateDatabase(context.Background(), &database)
+	err = connection.Client.CreateDatabase(&database)
 	if err != nil {
 		log.Fatal(err)
 	}
-	databases, err := connection.Client.GetAllDatabases(context.Background())
+	databases, err := connection.Client.GetAllDatabases()
 	if err != nil {
 		log.Fatal(err)
 	}
 	if !Contains(databases, name) {
 		t.Fatalf("%s not found, databases: %+v", name, databases)
 	}
-	err = connection.Client.DropDatabase(context.Background(), name, false, false)
+	err = connection.Client.DropDatabase(name, false, false)
 	if err != nil {
 		log.Fatal(err)
 	}
-	databases, err = connection.Client.GetAllDatabases(context.Background())
+	databases, err = connection.Client.GetAllDatabases()
 	if err != nil {
 		log.Fatal(err)
 	}

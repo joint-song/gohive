@@ -1,11 +1,10 @@
 package main
 
 import (
-	"context"
 	"log"
 
-	"github.com/beltran/gohive"
-	"github.com/beltran/gohive/hive_metastore"
+	"github.com/joint-song/gohive"
+	"github.com/joint-song/gohive/hive_metastore"
 )
 
 func main() {
@@ -17,11 +16,11 @@ func main() {
 	database := hive_metastore.Database{
 		Name:        "my_new_database",
 		LocationUri: "/"}
-	err = connection.Client.CreateDatabase(context.Background(), &database)
+	err = connection.Client.CreateDatabase(&database)
 	if err != nil {
 		log.Fatal(err)
 	}
-	databases, err := connection.Client.GetAllDatabases(context.Background())
+	databases, err := connection.Client.GetAllDatabases()
 	if err != nil {
 		log.Fatal(err)
 	}
