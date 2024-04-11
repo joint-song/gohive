@@ -1,6 +1,8 @@
-module github.com/beltran/gohive
+module github.com/joint-song/gohive
 
-go 1.14
+go 1.21
+
+toolchain go1.21.0
 
 require (
 	github.com/apache/thrift v0.0.0-20161221203622-b2a4d4ae21c7
@@ -8,3 +10,5 @@ require (
 	github.com/go-zookeeper/zk v1.0.1
 	github.com/pkg/errors v0.9.1
 )
+
+require github.com/beltran/gssapi v0.0.0-20200324152954-d86554db4bab // indirect
