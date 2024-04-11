@@ -17,9 +17,9 @@ import (
 	"time"
 
 	"github.com/apache/thrift/lib/go/thrift"
-	"github.com/beltran/gohive/hiveserver"
 	"github.com/beltran/gosasl"
 	"github.com/go-zookeeper/zk"
+	"github.com/joint-song/gohive/hiveserver"
 	"github.com/pkg/errors"
 )
 
@@ -194,29 +194,15 @@ func innerConnect(ctx context.Context, host string, port int, auth string,
 			return
 		}
 		if configuration.TLSConfig != nil {
-			socket = thrift.NewTSSLSocketFromConnConf(netConn, &thrift.TConfiguration{
-				ConnectTimeout: configuration.ConnectTimeout,
-				SocketTimeout:  configuration.SocketTimeout,
-				TLSConfig:      configuration.TLSConfig,
-			})
+			socket = thrift.NewTSSLSocketFromConnTimeout(netConn, configuration.TLSConfig, configuration.ConnectTimeout)
 		} else {
-			socket = thrift.NewTSocketFromConnConf(netConn, &thrift.TConfiguration{
-				ConnectTimeout: configuration.ConnectTimeout,
-				SocketTimeout:  configuration.SocketTimeout,
-			})
+			socket = thrift.NewTSocketFromConnTimeout(netConn, configuration.ConnectTimeout)
 		}
 	} else {
 		if configuration.TLSConfig != nil {
-			socket, err = thrift.NewTSSLSocketConf(addr, &thrift.TConfiguration{
-				ConnectTimeout: configuration.ConnectTimeout,
-				SocketTimeout:  configuration.SocketTimeout,
-				TLSConfig:      configuration.TLSConfig,
-			})
+			socket, err = thrift.NewTSSLSocketTimeout(addr, configuration.TLSConfig, configuration.ConnectTimeout)
 		} else {
-			socket, err = thrift.NewTSocketConf(addr, &thrift.TConfiguration{
-				ConnectTimeout: configuration.ConnectTimeout,
-				SocketTimeout:  configuration.SocketTimeout,
-			})
+			socket, err = thrift.NewTSocketTimeout(addr, configuration.ConnectTimeout)
 		}
 		if err != nil {
 			return
@@ -250,10 +236,7 @@ func innerConnect(ctx context.Context, host string, port int, auth string,
 				return nil, err
 			}
 			httpOptions := thrift.THttpClientOptions{Client: httpClient}
-			transport, err = thrift.NewTHttpClientTransportFactoryWithOptions(fmt.Sprintf(protocol+"://%s:%s@%s:%d/"+configuration.HTTPPath, url.QueryEscape(configuration.Username), url.QueryEscape(configuration.Password), host, port), httpOptions).GetTransport(socket)
-			if err != nil {
-				return nil, err
-			}
+			transport = thrift.NewTHttpClientTransportFactoryWithOptions(fmt.Sprintf(protocol+"://%s:%s@%s:%d/"+configuration.HTTPPath, url.QueryEscape(configuration.Username), url.QueryEscape(configuration.Password), host, port), httpOptions).GetTransport(socket)
 		} else if auth == "KERBEROS" {
 			mechanism, err := gosasl.NewGSSAPIMechanism(configuration.Service)
 			if err != nil {
@@ -277,13 +260,10 @@ func innerConnect(ctx context.Context, host string, port int, auth string,
 			httpOptions := thrift.THttpClientOptions{
 				Client: httpClient,
 			}
-			transport, err = thrift.NewTHttpClientTransportFactoryWithOptions(fmt.Sprintf(protocol+"://%s:%d/"+configuration.HTTPPath, host, port), httpOptions).GetTransport(socket)
+			transport = thrift.NewTHttpClientTransportFactoryWithOptions(fmt.Sprintf(protocol+"://%s:%d/"+configuration.HTTPPath, host, port), httpOptions).GetTransport(socket)
 			httpTransport, ok := transport.(*thrift.THttpClient)
 			if ok {
 				httpTransport.SetHeader("Authorization", "Negotiate "+base64.StdEncoding.EncodeToString(token))
-			}
-			if err != nil {
-				return nil, err
 			}
 		} else {
 			panic("Unrecognized auth")
@@ -678,7 +658,7 @@ func (c *Cursor) fetchIfEmpty(ctx context.Context) {
 	}
 }
 
-//RowMap returns one row as a map. Advances the cursor one
+// RowMap returns one row as a map. Advances the cursor one
 func (c *Cursor) RowMap(ctx context.Context) map[string]interface{} {
 	c.Err = nil
 	c.fetchIfEmpty(ctx)
