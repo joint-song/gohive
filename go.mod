@@ -1,8 +1,6 @@
 module github.com/joint-song/gohive
 
-go 1.21
-
-toolchain go1.21.0
+go 1.18
 
 require (
 	github.com/apache/thrift v0.0.0-20161221203622-b2a4d4ae21c7
