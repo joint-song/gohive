@@ -210,6 +210,9 @@ func innerConnect(ctx context.Context, host string, port int, auth string,
 		} else {
 			socket, err = thrift.NewTSocketTimeout(addr, configuration.ConnectTimeout)
 		}
+		if err != nil {
+			return
+		}
 		if err = socket.Open(); err != nil {
 			return
 		}
